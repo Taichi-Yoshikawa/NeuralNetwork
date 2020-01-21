@@ -5,6 +5,7 @@
 
 import numpy            as np
 import pandas           as pd
+from collections import OrderedDict
 import configuration    as cf
 
 
@@ -34,6 +35,7 @@ class NeuralNetwork():
 
     def predict(self):
         pass
+        
 
     def loss(self):
         pass
