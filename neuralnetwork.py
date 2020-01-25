@@ -11,57 +11,6 @@ from collections import OrderedDict as od
 import configuration                as cf
 
 
-# ------------
-#  Functions
-# ------------
-def identity_function(x):
-    return x
-
-def step_function(x):
-    return np.array(x > 0, dtype=np.int)
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-def sigmoid_grad(x):
-    return (1.0 - sigmoid(x)) * sigmoid(x)
-
-def relu(x):
-    return np.maximum(0, x)
-
-def relu_grad(x):
-    grad = np.zeros(x)
-    grad[x>=0] = 1
-    return grad
-
-def softmax(x):
-    if x.ndim == 2:
-        x = x.T
-        x = x - np.max(x, axis=0)
-        y = np.exp(x) / np.sum(np.exp(x), axis=0)
-        return y.T
-    # prevent from overflow
-    x = x - np.max(x)
-    return np.exp(x) / np.sum(np.exp(x))
-
-def sum_squared_error(y, t):
-    return 0.5 * np.sum((y-t)**2)
-
-def cross_entropy_error(y, t):
-    if y.ndim == 1:
-        t = t.reshape(1, t.size)
-        y = y.reshape(1, y.size)
-    # correct index
-    if t.size == y.size:
-        t = t.argmax(axis=1)
-    batch_size = y.shape[0]
-    return -np.sum(np.log(y[np.arange(batch_size), t] + 1e-7)) / batch_size
-
-def softmax_loss(X, t):
-    y = softmax(X)
-    return cross_entropy_error(y, t)
-
-
 # ----------------
 #  Neural Network
 # ----------------
@@ -69,16 +18,18 @@ class NeuralNetwork:
     '''
         3-Layer Neural Network
     '''
-    def __init__(self, weight_init_std = 0.01):
-        # import configuration
+    def __init__(self, seed=1):
+        # configuration
         self.cnf = cf.Configuration()
+        self.random = np.random
+        self.random.seed(seed)
         self.time = tm.strftime('%Y-%m-%d_%H-%M-%S')
         self.cnf_name = '_'.join([self.cnf.learning_method, self.cnf.loss_function, 'lr='+str(self.cnf.learning_rate)])
         # initialize parameters
         self.params = {}
-        self.params['W1'] = weight_init_std * np.random.randn(self.cnf.input_size, self.cnf.hidden_size)
+        self.params['W1'] = self.cnf.weight_init * self.random.randn(self.cnf.input_size, self.cnf.hidden_size)
         self.params['b1'] = np.zeros(self.cnf.hidden_size)
-        self.params['W2'] = weight_init_std * np.random.randn(self.cnf.hidden_size, self.cnf.output_size)
+        self.params['W2'] = self.cnf.weight_init * self.random.randn(self.cnf.hidden_size, self.cnf.output_size)
         self.params['b2'] = np.zeros(self.cnf.output_size)
         # Generate Layers
         self.layers = od()
@@ -103,7 +54,7 @@ class NeuralNetwork:
 
             for i in range(1,iters+1):
                 # select batch-data
-                batch_mask = np.random.choice(train_size, self.cnf.batch_size)
+                batch_mask = self.random.choice(train_size, self.cnf.batch_size)
                 x_batch = x_train[batch_mask].copy()
                 t_batch = t_train[batch_mask].copy()
 
@@ -144,7 +95,7 @@ class NeuralNetwork:
         if not df.shape[0] == (sum(self.cnf.dataset_ratio.values())):
             print('Error : dataset_ratio does not match loading dataset')
             return
-        rand_index = np.random.permutation(range(df.shape[0]))
+        rand_index = self.random.permutation(range(df.shape[0]))
         bound = self.cnf.dataset_ratio['train']
         # select [sepal_length, sepal_width, petal_length, petal_width]
         x_all = df[self.cnf.dataset_index['dec']].values
@@ -355,8 +306,11 @@ class Sigmoid:
     def __init__(self):
         self.out = None
 
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+
     def forward(self, x):
-        out = sigmoid(x)
+        out = self.sigmoid(x)
         self.out = out
         return out
 
@@ -410,13 +364,36 @@ class SoftmaxWithLoss:
         # label-data
         self.t      = None
 
+    def softmax(self, x):
+        if x.ndim == 2:
+            x = x.T
+            x = x - np.max(x, axis=0)
+            y = np.exp(x) / np.sum(np.exp(x), axis=0)
+            return y.T
+        # prevent from overflow
+        x = x - np.max(x)
+        return np.exp(x) / np.sum(np.exp(x))
+
+    def sum_squared_error(self, y, t):
+        return 0.5 * np.sum((y-t)**2)
+
+    def cross_entropy_error(self, y, t):
+        if y.ndim == 1:
+            t = t.reshape(1, t.size)
+            y = y.reshape(1, y.size)
+        # correct index
+        if t.size == y.size:
+            t = t.argmax(axis=1)
+        batch_size = y.shape[0]
+        return -np.sum(np.log(y[np.arange(batch_size), t] + 1e-7)) / batch_size
+
     def forward(self, x, t):
         self.t = t
-        self.y = softmax(x)
+        self.y = self.softmax(x)
         if self.cnf.loss_function == 'sum-squared-error' :
-            self.loss = sum_squared_error(self.y, self.t)
+            self.loss = self.sum_squared_error(self.y, self.t)
         if self.cnf.loss_function == 'cross-entropy-error' :
-            self.loss = cross_entropy_error(self.y, self.t)
+            self.loss = self.cross_entropy_error(self.y, self.t)
 
         return self.loss
 

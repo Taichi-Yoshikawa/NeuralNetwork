@@ -17,13 +17,13 @@ class Configuration():
         self.output_size        = 3
 
         # ----- Neural network options -----
-        ## learning method
         ## 'SGD', 'Momentum', 'AdaGrad', 'Adam'
         self.learning_method    = 'SGD'
         self.loss_function      = 'cross-entropy-error'#'sum-squared-error'
-        self.epoch              = 10000
+        self.epoch              = 1000
         self.batch_size         = 10
         self.learning_rate      = 0.1
+        self.weight_init        = 0.01
 
         # ----- Dataset Configuration -----
         self.dataset_url    = 'https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data'
