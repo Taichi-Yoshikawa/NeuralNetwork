@@ -18,11 +18,12 @@ class Configuration():
 
         # ----- Neural network options -----
         ## 'SGD', 'Momentum', 'AdaGrad', 'Adam'
-        self.learning_method    = 'SGD'
+        self.learning_method    = 'Adam'
         self.loss_function      = 'cross-entropy-error'#'sum-squared-error'
         self.epoch              = 1000
         self.batch_size         = 10
-        self.learning_rate      = 0.1
+        # SGD/Momentum/AdaGrad : 0.01  /  Adam : 0.001
+        self.learning_rate      = 0.001
         self.weight_init        = 0.01
 
         # ----- Dataset Configuration -----

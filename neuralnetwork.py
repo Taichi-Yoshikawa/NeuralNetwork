@@ -31,6 +31,7 @@ class NeuralNetwork:
         self.params['b1'] = np.zeros(self.cnf.hidden_size)
         self.params['W2'] = self.cnf.weight_init * self.random.randn(self.cnf.hidden_size, self.cnf.output_size)
         self.params['b2'] = np.zeros(self.cnf.output_size)
+        self.v, self.h, self.m = None, None, None
         # Generate Layers
         self.layers = od()
         self.layers['Affine1']  = Affine(self.params['W1'], self.params['b1'])
@@ -63,7 +64,7 @@ class NeuralNetwork:
                 grad = self.gradient(x_batch, t_batch)
 
                 # update parameters
-                self.updateParameters(grad)
+                self.updateParameters(grad, i)
 
                 # calculate loss function
                 loss = self.loss(x_batch, t_batch)
@@ -184,16 +185,45 @@ class NeuralNetwork:
         return self.lastLayer.forward(y, t)
 
 
-    def updateParameters(self, grad):
+    def updateParameters(self, grad, iter):
         '''
             update parameters
         '''
-        for key in self.params.keys():
-            if self.cnf.learning_method == 'SGD':
+        if self.cnf.learning_method == 'SGD':
+            for key in self.params.keys():
                 self.params[key] -= self.cnf.learning_rate * grad[key]
-            else:
-                print('Error : learning_method is invalid value.')
-                return
+        elif self.cnf.learning_method == 'Momentum':
+            if self.v is None:
+                self.momentum = 0.9
+                self.v = {}
+                for key, val in self.params.items():
+                    self.v[key] = np.zeros_like(val)
+            for key in self.params.keys():
+                self.v[key] = self.momentum * self.v[key] - self.cnf.learning_rate * grad[key]
+                self.params[key] += self.v[key]
+        elif self.cnf.learning_method == 'AdaGrad':
+            if self.h is None:
+                self.h = {}
+                for key, val in self.params.items():
+                    self.h[key] = np.zeros_like(val)
+            for key in self.params.keys():
+                self.h[key] += grad[key] * grad[key]
+                self.params[key] -= self.cnf.learning_rate * grad[key] / (np.sqrt(self.h[key]) + 1e-7)
+        elif self.cnf.learning_method == 'Adam':
+            if self.m is None:
+                self.m, self.v = {}, {}
+                self.beta = [0.9, 0.999]
+                for key,val in self.params.items():
+                    self.m[key], self.v[key] = np.zeros_like(val), np.zeros_like(val)
+            for key in self.params.keys():
+                self.m[key] = self.beta[0] * self.m[key] + (1. - self.beta[0]) * grad[key]
+                self.v[key] = self.beta[1] * self.v[key] + (1. - self.beta[1]) * (grad[key]**2)
+                m_hat = self.m[key] / (1. - self.beta[0]**iter)
+                v_hat = self.v[key] / (1. - self.beta[1]**iter)
+                self.params[key] -= self.cnf.learning_rate * m_hat / ( np.sqrt(v_hat) + 1e-7 )
+        else:
+            print('Error : learning_method is invalid value.')
+            return
 
 
     def accuracy(self, x, t):
