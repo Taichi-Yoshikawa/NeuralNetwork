@@ -20,16 +20,91 @@ class NeuralNetwork:
     '''
     def __init__(self, seed=1):
         # configuration
+        self.seed = seed  if isinstance(seed,(range,list)) else [seed]
         self.cnf = cf.Configuration()
         self.random = np.random
-        self.random.seed(seed)
         self.time = tm.strftime('%Y-%m-%d_%H-%M-%S')
         self.cnf_name = '_'.join([self.cnf.learning_method, self.cnf.loss_function, 'lr='+str(self.cnf.learning_rate)])
+
+
+    def main(self):
+        '''
+            main function
+        '''
+        try:
+            for i in range(len(self.seed)):
+                # timer start
+                start_time = tm.time()
+                # set seed-value of numpy.random
+                self.random.seed(self.seed[i])
+                # initialize
+                self.initialize()
+                # loading dataset
+                (x_train, t_train), (x_test, t_test) = self.loadDataset(i)
+                # number of data
+                train_size = x_train.shape[0]
+                train_loss_list, train_acc_list, test_acc_list = [], [], []
+                iter_per_epoch = max(train_size // self.cnf.batch_size, 1)
+                iters = self.cnf.epoch * iter_per_epoch
+
+                for j in range(1,iters+1):
+                    # select batch-data
+                    batch_mask = self.random.choice(train_size, self.cnf.batch_size)
+                    x_batch = x_train[batch_mask].copy()
+                    t_batch = t_train[batch_mask].copy()
+
+                    # calculate gradient
+                    if self.cnf.gradient_method == 'bp':
+                        grad = self.gradient(x_batch, t_batch)
+                    elif self.cnf.gradient_method == 'num':
+                        grad = self.numerical_gradient(x_batch, t_batch)
+                    else:
+                        print('Error : gradient_method is invalid value.')
+
+                    # update parameters
+                    self.updateParameters(grad, j)
+
+                    # calculate loss function
+                    loss = self.loss(x_batch, t_batch)
+
+                    # record accuracy
+                    if (j % iter_per_epoch) == 0:
+                        train_loss_list.append(loss)
+                        train_acc = self.accuracy(x_train, t_train)
+                        test_acc = self.accuracy(x_test, t_test)
+                        train_acc_list.append(train_acc)
+                        test_acc_list.append(test_acc)
+                        print('{} epoch : {}[%]\t {}[%]'.format(str(j//iter_per_epoch).rjust(6), round(train_acc*100,3) ,round(test_acc*100,3)))
+
+                # plot figure
+                # self.plotFigure(test_acc_list, train_acc_list, train_loss_list)
+                # save experimental data
+                self.saveExperimentalData(i, {'train_acc': train_acc_list , 'test_acc': test_acc_list, 'train_loss': train_loss_list})
+
+                # timer end
+                end_time = tm.time()
+                exe_time = end_time - start_time
+                print('[ exe-time : {}[s] ]'.format(round(exe_time,1)))
+
+            # summarize experimental data
+            self.summarizeExperimentalData()
+
+        except Exception as e:
+            print('Error : {}'.format(e))
+
+
+    def initialize(self):
         # initialize parameters
         self.params = {}
-        self.params['W1'] = self.cnf.weight_init * self.random.randn(self.cnf.input_size, self.cnf.hidden_size)
+        if self.cnf.init_method == 'Xavier':
+            std = [ np.sqrt(1./self.cnf.input_size), np.sqrt(1./self.cnf.hidden_size)]
+        elif self.cnf.init_method == 'He':
+            std = [ np.sqrt(2./self.cnf.input_size), np.sqrt(2./self.cnf.hidden_size)]
+        else:
+            print('Error : initial_method is invalid value.')
+        self.params['W1'] = self.random.normal(0,std[0],(self.cnf.input_size, self.cnf.hidden_size))
         self.params['b1'] = np.zeros(self.cnf.hidden_size)
-        self.params['W2'] = self.cnf.weight_init * self.random.randn(self.cnf.hidden_size, self.cnf.output_size)
+        self.params['W2'] = self.random.normal(0,std[1],(self.cnf.hidden_size, self.cnf.output_size))
         self.params['b2'] = np.zeros(self.cnf.output_size)
         self.v, self.h, self.m = None, None, None
         # Generate Layers
@@ -40,132 +115,6 @@ class NeuralNetwork:
         self.lastLayer = SoftmaxWithLoss(self.cnf)
 
 
-    def main(self):
-        '''
-            main function
-        '''
-        try:
-            # loading dataset
-            (x_train, t_train), (x_test, t_test) = self.loadDataset()
-            # number of data
-            train_size = x_train.shape[0]
-            train_loss_list, train_acc_list, test_acc_list = [], [], []
-            iter_per_epoch = max(train_size // self.cnf.batch_size, 1)
-            iters = self.cnf.epoch * iter_per_epoch
-
-            for i in range(1,iters+1):
-                # select batch-data
-                batch_mask = self.random.choice(train_size, self.cnf.batch_size)
-                x_batch = x_train[batch_mask].copy()
-                t_batch = t_train[batch_mask].copy()
-
-                # calculate gradient
-                #grad = network.numerical_gradient(x_batch, t_batch)
-                grad = self.gradient(x_batch, t_batch)
-
-                # update parameters
-                self.updateParameters(grad, i)
-
-                # calculate loss function
-                loss = self.loss(x_batch, t_batch)
-
-                # record accuracy
-                if (i % iter_per_epoch) == 0:
-                    train_loss_list.append(loss)
-                    train_acc = self.accuracy(x_train, t_train)
-                    test_acc = self.accuracy(x_test, t_test)
-                    train_acc_list.append(train_acc)
-                    test_acc_list.append(test_acc)
-                    print('{} epoch : {}[%]\t {}[%]'.format(str(i//iter_per_epoch).rjust(6), round(train_acc*100,3) ,round(test_acc*100,3)))
-
-            # plot figure
-            self.plotFigure(test_acc_list, train_acc_list, train_loss_list)
-            # save experimental data
-            self.saveExperimentalData({'train_acc': train_acc_list , 'test_acc': test_acc_list, 'train_loss': train_loss_list})
-
-        except Exception as e:
-            print('Error : {}'.format(e))
-
-
-    def loadDataset(self):
-        '''
-            load dataset from URL
-        '''
-        df = pd.read_csv(self.cnf.dataset_url, header=None)
-        # error
-        if not df.shape[0] == (sum(self.cnf.dataset_ratio.values())):
-            print('Error : dataset_ratio does not match loading dataset')
-            return
-        rand_index = self.random.permutation(range(df.shape[0]))
-        bound = self.cnf.dataset_ratio['train']
-        # select [sepal_length, sepal_width, petal_length, petal_width]
-        x_all = df[self.cnf.dataset_index['dec']].values
-        t_all_origin = df[self.cnf.dataset_index['obj']].values
-        # transform one-hot vector
-        t_all = []
-        for i in range(len(t_all_origin)):
-            t_all.append(self.cnf.dataset_one_hot_vector[t_all_origin[i]])
-        t_all = np.array(t_all)
-        # separate data
-        x_train = x_all[rand_index[:bound]]
-        x_test  = x_all[rand_index[bound:]]
-        t_train = t_all[rand_index[:bound]]
-        t_test  = t_all[rand_index[bound:]]
-
-        return (x_train, t_train), (x_test, t_test)
-
-
-    def plotFigure(self, test_acc_list, train_acc_list, train_loss_list):
-        folder_name = 'graph'
-        path_graph = self.cnf.path_out + '/' + folder_name
-        # make directory
-        if not os.path.isdir(path_graph):
-            os.makedirs(path_graph)
-        x_axis = range(1, self.cnf.epoch + 1)
-
-        # graph-1 : accuracy
-        title1 = 'accuracy' + '_' + self.cnf_name
-        fig1 = plt.figure(figsize=(10,6))
-        ax1 = fig1.add_subplot(1,1,1)
-        ax1.plot(x_axis, train_acc_list, color='green', alpha=0.7, label='train', linewidth = 1.0)
-        ax1.plot(x_axis, test_acc_list, color='orange', alpha=0.7, label='test', linewidth = 1.0)
-        ax1.set_title(title1)
-        ax1.set_xlim(0, self.cnf.epoch)
-        ax1.set_ylim(0.0, 1.0)
-        ax1.set_xlabel('epochs')
-        ax1.set_ylabel('accuracy')
-        ax1.legend()
-        fig1.savefig(path_graph + '/' + title1 + ".png" , dpi=300)
-
-        # graph-2 : loss-function
-        title2 = 'loss-function' + '_' + self.cnf_name
-        fig2 = plt.figure(figsize=(10,6))
-        ax2 = fig2.add_subplot(1,1,1)
-        ax2.plot(x_axis, train_loss_list, linewidth = 1.0)
-        ax2.set_title(title2)
-        ax2.set_ylim(0.0)
-        ax2.set_xlim(0, self.cnf.epoch)
-        ax2.set_xlabel('epochs')
-        ax2.set_ylabel('loss-function-value')
-        fig2.savefig(path_graph + '/' + title2 + ".png" , dpi=300)
-
-        # plt.show()
-
-
-    def saveExperimentalData(self, data_dict=None):
-        '''
-            save experimental data
-        '''
-        if not data_dict is None:
-            folder_name = 'table'
-            path_table = self.cnf.path_out + '/' + folder_name
-            # make directory
-            if not os.path.isdir(path_table):
-                os.makedirs(path_table)
-            df = pd.DataFrame(data_dict.values(), index=data_dict.keys(), columns=range(1,self.cnf.epoch+1)).T
-            df.to_csv(path_table + '/' + 'experimental-data_' + self.cnf_name + '.csv')
-
-
     def predict(self, x):
         '''
             predict solution (x→y)
@@ -173,7 +122,6 @@ class NeuralNetwork:
         for layer in self.layers.values():
             x = layer.forward(x)
         return x
-
 
 
     def loss(self, x, t):
@@ -240,7 +188,7 @@ class NeuralNetwork:
         return accuracy
 
 
-    def cal_numerical_gradient(self, f, x):
+    def _numerical_gradient(self, f, x):
         '''
             numerical differential
             ( f:loss-function, x:input-data)
@@ -272,10 +220,10 @@ class NeuralNetwork:
         loss_W = lambda W: self.loss(x, t)
 
         grads = {}
-        grads['W1'] = self.cal_numerical_gradient(loss_W, self.params['W1'])
-        grads['b1'] = self.cal_numerical_gradient(loss_W, self.params['b1'])
-        grads['W2'] = self.cal_numerical_gradient(loss_W, self.params['W2'])
-        grads['b2'] = self.cal_numerical_gradient(loss_W, self.params['b2'])
+        grads['W1'] = self._numerical_gradient(loss_W, self.params['W1'])
+        grads['b1'] = self._numerical_gradient(loss_W, self.params['b1'])
+        grads['W2'] = self._numerical_gradient(loss_W, self.params['W2'])
+        grads['b2'] = self._numerical_gradient(loss_W, self.params['b2'])
 
         return grads
 
@@ -303,6 +251,137 @@ class NeuralNetwork:
         grads['W2'], grads['b2'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
 
         return grads
+
+
+    def loadDataset(self, i):
+        '''
+            load dataset from URL
+        '''
+        if i==0:
+            df = pd.read_csv(self.cnf.dataset_url, header=None)
+            df.to_csv(self.cnf.path_out + '/' + self.cnf.dataset_url.split('/')[-1], header=False, index=False)
+        else:
+            df = pd.read_csv(self.cnf.path_out + '/' + self.cnf.dataset_url.split('/')[-1], header=None)
+        # error
+        if not df.shape[0] == (sum(self.cnf.dataset_ratio.values())):
+            print('Error : dataset_ratio does not match loading dataset')
+            return
+        rand_index = self.random.permutation(range(df.shape[0]))
+        bound = self.cnf.dataset_ratio['train']
+        # select [sepal_length, sepal_width, petal_length, petal_width]
+        x_all = df[self.cnf.dataset_index['dec']].values
+        t_all_origin = df[self.cnf.dataset_index['obj']].values
+        # transform one-hot vector
+        t_all = []
+        for i in range(len(t_all_origin)):
+            t_all.append(self.cnf.dataset_one_hot_vector[t_all_origin[i]])
+        t_all = np.array(t_all)
+        # separate data
+        x_train = x_all[rand_index[:bound]]
+        x_test  = x_all[rand_index[bound:]]
+        t_train = t_all[rand_index[:bound]]
+        t_test  = t_all[rand_index[bound:]]
+
+        return (x_train, t_train), (x_test, t_test)
+
+
+    def saveExperimentalData(self, i, data_dict=None):
+        '''
+            save experimental data
+        '''
+        if not data_dict is None:
+            folder_name_t = 'table'
+            self.path_table = self.cnf.path_out + '/' + folder_name_t + '/' + self.cnf_name
+            # make directory
+            if not os.path.isdir(self.path_table):
+                os.makedirs(self.path_table)
+            df = pd.DataFrame(data_dict.values(), index=data_dict.keys(), columns=range(1,self.cnf.epoch+1)).T
+            df.to_csv(self.path_table + '/' + 'experimental-data_' + self.cnf_name + '_seed=' + str(self.seed[i]) + '.csv')
+
+
+    def summarizeExperimentalData(self):
+        '''
+            summarize experimental data
+        '''
+        folder_name_g = 'graph'
+        self.path_graph = self.cnf.path_out + '/' + folder_name_g
+        # make directory
+        if not os.path.isdir(self.path_graph):
+            os.makedirs(self.path_graph)
+
+        df = {}
+        for i in range(len(self.seed)):
+            # read experimental data
+            dt = pd.read_csv(self.path_table + '/' + 'experimental-data_' + self.cnf_name + '_seed=' + str(self.seed[i]) + '.csv', index_col = 0)
+            self.dt_columns = dt.columns.values
+            for col in self.dt_columns:
+                # make dataframe
+                if i == 0:
+                    df[col] = pd.DataFrame({'seed={}'.format(self.seed[i]) : np.array(dt[col])}, index = dt.index)
+                else:
+                    df[col]['seed={}'.format(self.seed[i])] = np.array(dt[col])
+
+        # calculate statistics-value
+        for col in self.dt_columns:
+            _min, _max, _q25, _med, _q75, _ave, _std = [], [], [], [], [], [], []
+            for i in range(len(df[col].index)):
+                dtset   = np.array(df[col].loc[df[col].index[i]])
+                res     = np.percentile(dtset, [25, 50, 75])
+                _min.append(dtset.min())
+                _max.append(dtset.max())
+                _q25.append(res[0])
+                _med.append(res[1])
+                _q75.append(res[2])
+                _ave.append(dtset.mean())
+                _std.append(np.std(dtset))
+
+            # make dataframe for statistics
+            _out = pd.DataFrame({
+                'min' : np.array(_min),
+                'q25' : np.array(_q25),
+                'med' : np.array(_med),
+                'q75' : np.array(_q75),
+                'max' : np.array(_max),
+                'ave' : np.array(_ave),
+                'std' : np.array(_std)
+                },index = df[col].index)
+
+            # save summarized experimental data
+            _out.to_csv(self.path_table + '/' + 'summarized-experimental-data_' + col + '_' + self.cnf_name + '.csv')
+
+            # plot figure
+            if 'acc' in col:
+                title = 'accuracy_' + self.cnf_name
+                if 'train' in col:
+                    fig = plt.figure(figsize=(10, 6))
+                    ax  = fig.add_subplot(1,1,1)
+                    ax.plot(_out.index, _med , color='green', alpha=0.7, label='train', linewidth = 1.0)
+                    ax.fill_between(_out.index, _q25, _q75, facecolor='green', alpha=0.1)
+                    ax.set_title(title)
+                    ax.set_xlabel('epochs')
+                    ax.set_ylabel('accuracy')
+                    ax.set_xlim(0, self.cnf.epoch)
+                    ax.set_ylim(0.0, 1.0)
+                elif 'test' in col:
+                    ax.plot(_out.index, _med , color='orange', alpha=0.7, label='test', linewidth = 1.0)
+                    ax.fill_between(_out.index, _q25, _q75, facecolor='orange', alpha=0.1)
+                    # save figure
+                    fig.savefig(self.path_graph + '/' + title + '.png', dpi=300)
+                    plt.close()
+            elif 'loss' in col:
+                title = 'loss-function_' + self.cnf_name
+                fig = plt.figure(figsize=(10, 6))
+                ax  = fig.add_subplot(1,1,1)
+                ax.plot(_out.index, _med , color='blue', alpha=0.7, label='train', linewidth = 1.0)
+                ax.fill_between(_out.index, _q25, _q75, facecolor='blue', alpha=0.1)
+                ax.set_title(title)
+                ax.set_xlabel('epochs')
+                ax.set_ylabel('loss-function-value')
+                ax.set_xlim(0, self.cnf.epoch)
+                ax.set_ylim(0.0)
+                # save figure
+                fig.savefig(self.path_graph + '/' + title + '.png', dpi=300)
+                plt.close()
 
 
 # --------
@@ -441,5 +520,5 @@ class SoftmaxWithLoss:
 
 
 if __name__ == "__main__":
-    nn = NeuralNetwork()
+    nn = NeuralNetwork(range(10))
     nn.main()

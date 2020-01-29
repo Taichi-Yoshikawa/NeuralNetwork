@@ -17,14 +17,18 @@ class Configuration():
         self.output_size        = 3
 
         # ----- Neural network options -----
-        ## 'SGD', 'Momentum', 'AdaGrad', 'Adam'
-        self.learning_method    = 'Adam'
-        self.loss_function      = 'cross-entropy-error'#'sum-squared-error'
+        ## sigmoid/tanh : Xavier /  ReLU : He
+        self.init_method        = 'He'
+        ## SGD/Momentum/AdaGrad/Adam
+        self.learning_method    = 'SGD'
+        ## AdaGrad : 0.1 , SGD/Momentum/Adam : 0.01
+        self.learning_rate      = 0.01
+        ## numerical grad : num  / back-propagation : bp
+        self.gradient_method    = 'bp'
+        ## 'sum-squared-error', 'cross-entropy-error'
+        self.loss_function      = 'cross-entropy-error'
         self.epoch              = 1000
         self.batch_size         = 10
-        # SGD/Momentum/AdaGrad : 0.01  /  Adam : 0.001
-        self.learning_rate      = 0.001
-        self.weight_init        = 0.01
 
         # ----- Dataset Configuration -----
         self.dataset_url    = 'https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data'
