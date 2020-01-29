@@ -20,8 +20,8 @@ class Configuration():
         ## sigmoid/tanh : Xavier /  ReLU : He
         self.init_method        = 'He'
         ## SGD/Momentum/AdaGrad/Adam
-        self.learning_method    = 'SGD'
-        ## AdaGrad : 0.1 , SGD/Momentum/Adam : 0.01
+        self.learning_method    = 'Adam'
+        ## AdaGrad : 0.1 , SGD/Adam : 0.01 , Momentum : 0.001
         self.learning_rate      = 0.01
         ## numerical grad : num  / back-propagation : bp
         self.gradient_method    = 'bp'

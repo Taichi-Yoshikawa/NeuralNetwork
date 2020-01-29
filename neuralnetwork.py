@@ -257,7 +257,7 @@ class NeuralNetwork:
         '''
             load dataset from URL
         '''
-        if i==0:
+        if (i==0) and not (os.path.exists(self.cnf.path_out + '/' + self.cnf.dataset_url.split('/')[-1])) :
             df = pd.read_csv(self.cnf.dataset_url, header=None)
             df.to_csv(self.cnf.path_out + '/' + self.cnf.dataset_url.split('/')[-1], header=False, index=False)
         else:
@@ -365,6 +365,7 @@ class NeuralNetwork:
                 elif 'test' in col:
                     ax.plot(_out.index, _med , color='orange', alpha=0.7, label='test', linewidth = 1.0)
                     ax.fill_between(_out.index, _q25, _q75, facecolor='orange', alpha=0.1)
+                    ax.legend()
                     # save figure
                     fig.savefig(self.path_graph + '/' + title + '.png', dpi=300)
                     plt.close()
