@@ -1,6 +1,6 @@
-# << Intelligent systems >>
-# REPORT#1 : 3-Layer Neural Network
-# - Neural Network
+# Neural Network
+# [Yoshikawa Taichi]
+# version 2.4 (Jan. 29, 2020)
 
 import os
 import time                         as tm
